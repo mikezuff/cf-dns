@@ -72,7 +72,7 @@ func main() {
 		log.Fatal("error: DNSRecords:", err)
 	}
 
-	testNames := []string{"cf-dns-test-1", "cf-dns-test-2"}
+	testNames := []string{"cf-dns-test-1.sub", "cf-dns-test-2.sub"}
 	found := false
 	for _, testName := range testNames {
 		for _, rec := range recs {
@@ -106,6 +106,8 @@ func main() {
 		rrIDs = append(rrIDs, resp1.Result.ID)
 		respRecords = append(respRecords, &resp1.Result)
 
+		create(api, ctx, zid, "double create", testNames[0], "CNAME", "ns1.zuffs.net")
+
 		testRR2 := resp1.Result
 		testRR2.Name = testNames[1]
 		err = api.UpdateDNSRecord(ctx, zid, rrIDs[0], testRR2)
@@ -126,10 +128,28 @@ func main() {
 
 		rec3, err := api.DNSRecord(ctx, zid, rrIDs[0])
 		if err != nil {
-			log.Printf("Get after Delete returned error: %s", err)
+			log.Printf("get after Delete returned expected error: %s", err)
 		} else {
-			log.Printf("After deletion, query for %s returned a result\n", rrIDs[0])
+			log.Printf("after deletion, query for %s returned a result\n", rrIDs[0])
 			respRecords = append(respRecords, &rec3)
+		}
+
+		{
+			id1, _ := create(api, ctx, zid, "first A", testNames[0], "A", "23.185.0.4")
+			id2, _ := create(api, ctx, zid, "second A", testNames[0], "A", "165.91.22.70")
+
+			if id1 != "" {
+				err := api.DeleteDNSRecord(ctx, zid, id1)
+				if err != nil {
+					log.Print("deletion of ", id1, " failed ", err)
+				}
+			}
+			if id2 != "" {
+				err := api.DeleteDNSRecord(ctx, zid, id2)
+				if err != nil {
+					log.Print("deletion of ", id2, " failed ", err)
+				}
+			}
 		}
 	}
 
@@ -147,4 +167,20 @@ func main() {
 		Responses: respRecords,
 	}
 	enc.Encode(o)
+}
+
+func create(api *cloudflare.API, ctx context.Context, zid, label, name, rrType, content string) (string, error) {
+	resp, err := api.CreateDNSRecord(ctx, zid, cloudflare.DNSRecord{
+		Type:    rrType,
+		Name:    name,
+		Content: content,
+		TTL:     1,
+	})
+	if err != nil {
+		log.Printf("%s returned error: %s", label, err)
+		return "", err
+	} else {
+		log.Printf("%s returned response: %v", label, resp)
+		return resp.Result.ID, nil
+	}
 }

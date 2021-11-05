@@ -11,5 +11,5 @@ echo "export CLOUDFLARE_API_KEY='2345678345678456783456783456784567842'" >> keys
 Running
 
 ```
-go build && ./cf-dns | jq .
+go build && ./cf-dns -zone example.com | jq .
 ```
